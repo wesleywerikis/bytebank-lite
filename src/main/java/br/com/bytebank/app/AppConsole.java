@@ -15,9 +15,10 @@ public final class AppConsole {
 
     private final RepositorioCliente repositorioCliente;
     private final RepositorioConta repositorioConta;
+    private Cliente clienteLogado = null;
 
     public AppConsole(RepositorioCliente repositorioCliente, RepositorioConta repositorioConta) {
-        if (repositorioCliente == null) throw new IllegalArgumentException("repositorioCLiente é orbigadtório.");
+        if (repositorioCliente == null) throw new IllegalArgumentException("repositorioCliente é obrigatório.");
         if (repositorioConta == null) throw new IllegalArgumentException("repositorioConta é obrigatório.");
         this.repositorioCliente = repositorioCliente;
         this.repositorioConta = repositorioConta;
@@ -30,18 +31,17 @@ public final class AppConsole {
                 int opcao = lerInt("Escolha: ");
 
                 switch (opcao) {
-                    case 1 -> criarCliente();
-                    case 2 -> criarConta();
-                    case 3 -> listarCliente();
-                    case 4 -> listarContas();
-                    case 5 -> depositar();
-                    case 6 -> sacar();
-                    case 7 -> transferir();
                     case 0 -> {
                         System.out.println("Encerrando. Até!");
                         return;
                     }
-                    default -> System.out.println("Opção inválida.");
+                    default -> {
+                        if (clienteLogado == null) {
+                            executarMenuPublico(opcao);
+                        } else {
+                            executarMenuCliente(opcao);
+                        }
+                    }
                 }
             } catch (Exception e) {
                 System.out.println("Erro: " + e.getMessage());
@@ -50,16 +50,159 @@ public final class AppConsole {
         }
     }
 
+    private void executarMenuPublico(int opcao) {
+        switch (opcao) {
+            case 1 -> loginCliente();
+            case 2 -> criarCliente();
+            case 3 -> listarClientes();
+            default -> System.out.println("Opção inválida.");
+        }
+    }
+
+    private void executarMenuCliente(int opcao) {
+        switch (opcao) {
+            case 1 -> criarContaParaClienteLogado();
+            case 2 -> listarMinhasContas();
+            case 3 -> depositarEmMinhaConta();
+            case 4 -> sacarDeMinhaConta();
+            case 5 -> transferirDeMinhaConta();
+            case 6 -> logout();
+            default -> System.out.println("Opção inválida.");
+        }
+    }
+
+    private void loginCliente() {
+        var todos = repositorioCliente.listarTodos();
+
+        if (todos.isEmpty()) {
+            System.out.println("Nenhum cliente cadastrado. Crie um cliente primeiro.");
+            return;
+        }
+
+        System.out.println("Selecione um cliente:");
+        for (int i = 0; i < todos.size(); i++) {
+            Cliente c = todos.get(i);
+            System.out.println("[" + (i + 1) + "]" + c.getNome() + " | ID: " + c.getId());
+        }
+
+        int escolha = lerInt("Escolha o número: ");
+        if (escolha < 1 || escolha > todos.size()) {
+            throw new IllegalArgumentException("Número inválido.");
+        }
+
+        clienteLogado = todos.get(escolha - 1);
+        System.out.println("Logado como: " + clienteLogado.getNome());
+    }
+
+    private void logout() {
+        System.out.println("Saíndo do cliente: " + clienteLogado.getNome());
+        clienteLogado = null;
+    }
+
+    private void criarContaParaClienteLogado() {
+        if (clienteLogado == null) throw new IllegalArgumentException("Faça login primeiro.");
+
+        Conta conta = new Conta(clienteLogado);
+        repositorioConta.salvar(conta);
+        System.out.println("Conta criada: " + conta.getId());
+    }
+
+    private void listarMinhasContas() {
+        if (clienteLogado == null) throw new IllegalArgumentException("Faça login primeiro.");
+
+        var todas = repositorioConta.listarTodas();
+        var minhas = todas.stream()
+                .filter(c -> c.getTitular().getId().equals(clienteLogado.getId()))
+                .toList();
+
+        if (minhas.isEmpty()) {
+            System.out.println("Você ainda não tem contas.");
+            return;
+        }
+
+        System.out.println("Minhas contas:");
+        for (int i = 0; i < minhas.size(); i++) {
+            Conta c = minhas.get(i);
+            System.out.println("[" + (i + 1) + "]" + c.getId() + " | Saldo: " + c.getSaldo());
+        }
+
+    }
+
+    private Conta escolherMinhaContaPorNumero(String titulo) {
+        if (clienteLogado == null) throw new IllegalArgumentException("Faça login primeiro.");
+
+        var minhas = repositorioConta.listarTodas().stream()
+                .filter(c -> c.getTitular().getId().equals(clienteLogado.getId()))
+                .toList();
+
+        if (minhas.isEmpty()) {
+            throw new IllegalArgumentException("Você ainda não tem contas.");
+        }
+
+        System.out.println(titulo);
+        for (int i = 0; i < minhas.size(); i++) {
+            Conta c = minhas.get(i);
+            System.out.println("[" + (i + 1) + "] Saldo: " + c.getSaldo() + " | ID: " + c.getId());
+        }
+
+        int escolha = lerInt("Escolha o número: ");
+        if (escolha < 1 || escolha > minhas.size()) {
+            throw new IllegalArgumentException("Número inválido.");
+        }
+        return minhas.get(escolha - 1);
+    }
+
+    private void depositarEmMinhaConta() {
+        Conta conta = escolherMinhaContaPorNumero("Selecione a conta para DEPÓSITO:");
+        BigDecimal valor = lerBigDecimal("Valor do depósito: ");
+        conta.depositar(valor);
+        repositorioConta.salvar(conta);
+        System.out.println("Saldo atual: " + conta.getSaldo());
+    }
+
+    private void sacarDeMinhaConta() {
+        Conta conta = escolherMinhaContaPorNumero("Selecione a conta para SAQUE:");
+        BigDecimal valor = lerBigDecimal("Valor do saque: ");
+        conta.sacar(valor);
+        repositorioConta.salvar(conta);
+        System.out.println("Saldo atual: " + conta.getSaldo());
+    }
+
+    private void transferirDeMinhaConta() {
+        Conta origem = escolherMinhaContaPorNumero("Selecione a conta ORIGEM:");
+
+        UUID destinoId = lerUUID("ID da conta DESTINO (UUID): ");
+        Conta destino = repositorioConta.buscarPorId(destinoId)
+                .orElseThrow(() -> new IllegalArgumentException("Conta destino não encontrada."));
+
+        BigDecimal valor = lerBigDecimal("Valor da transferência: ");
+        origem.transferirPara(destino, valor);
+
+        repositorioConta.salvar(origem);
+        repositorioConta.salvar(destino);
+
+        System.out.println("Transferência OK.");
+        System.out.println("Saldo origem: " + origem.getSaldo());
+    }
+
     private void mostrarMenu() {
         System.out.println("=== ByteBank Lite (Console) ===");
-        System.out.println("1) Criar cliente");
-        System.out.println("2) Criar conta");
-        System.out.println("3) Listar clientes");
-        System.out.println("4) Listar contas");
-        System.out.println("5) Depositar");
-        System.out.println("6) Sacar");
-        System.out.println("7) Transferir");
-        System.out.println("0) Sair");
+
+        if (clienteLogado == null) {
+            System.out.println("1) Login (selecionar cliente)");
+            System.out.println("2) Criar cliente");
+            System.out.println("3) Listar clientes");
+            System.out.println("0) Sair");
+        } else {
+            System.out.println("Cliente: " + clienteLogado.getNome() + " (" + clienteLogado.getId() + ")");
+            System.out.println("1) Criar conta");
+            System.out.println("2) Minhas contas");
+            System.out.println("3) Depositar");
+            System.out.println("4) Sacar");
+            System.out.println("5) Transferir");
+            System.out.println("6) Trocar cliente (logout)");
+            System.out.println("0) Sair");
+        }
     }
 
     private void criarCliente() {
@@ -69,18 +212,7 @@ public final class AppConsole {
         System.out.println("Cliente criado: " + c.getId());
     }
 
-    private void criarConta() {
-        UUID clienteId = lerUUID("ID do cliente (UUID): ");
-        Cliente titular = repositorioCliente.buscarPorId(clienteId)
-                .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado."));
-
-        Conta conta = new Conta(titular);
-        repositorioConta.salvar(conta);
-
-        System.out.println("Conta criada: " + conta.getId() + " (Titular: " + titular.getNome() + ")");
-    }
-
-    private void listarCliente() {
+    private void listarClientes() {
         var todos = repositorioCliente.listarTodos();
 
         if (todos.isEmpty()) {
@@ -93,63 +225,8 @@ public final class AppConsole {
         }
     }
 
-    private void listarContas() {
-        var todas = repositorioConta.listarTodas();
-
-        if (todas.isEmpty()) {
-            System.out.println("Nenhuma conta cadastrada.");
-            return;
-        }
-        System.out.println("Contas:");
-        for (Conta c : todas) {
-            System.out.println("- " + c.getId()
-                    + " | Titular: " + c.getTitular().getNome()
-                    + " | Saldo: " + c.getSaldo());
-        }
-    }
-
-    private void depositar() {
-        Conta conta = buscarContaPorId();
-        BigDecimal valor = lerBigDecimal("Valor do depósito: ");
-        conta.depositar(valor);
-        repositorioConta.salvar(conta);
-        System.out.println("Depósito realizado. Saldo atual: " + conta.getSaldo());
-    }
-
-    private void sacar() {
-        Conta conta = buscarContaPorId();
-        BigDecimal valor = lerBigDecimal("Valor do saque: ");
-        conta.sacar(valor);
-        repositorioConta.salvar(conta);
-        System.out.println("Saque realizado. Saldo atual: " + conta.getSaldo());
-    }
-
-    private void transferir() {
-        System.out.println("Conta ORIGEM:");
-        Conta origem = buscarContaPorId();
-
-        System.out.println("Conta DESTINO:");
-        Conta destino = buscarContaPorId();
-
-        BigDecimal valor = lerBigDecimal("Valor da transferência: ");
-        origem.transferirPara(destino, valor);
-
-        repositorioConta.salvar(origem);
-        repositorioConta.salvar(destino);
-
-        System.out.println("Transferência OK.");
-        System.out.println("Saldo origem: " + origem.getSaldo());
-        System.out.println("Saldo destino: " + destino.getSaldo());
-    }
-
-    private Conta buscarContaPorId() {
-        UUID contaId = lerUUID("ID da conta (UUID): ");
-        return repositorioConta.buscarPorId(contaId)
-                .orElseThrow(() -> new IllegalArgumentException("Conta não encontrada"));
-    }
-
     private String lerString(String label) {
-        System.out.println(label);
+        System.out.print(label);
         String s = in.nextLine();
         if (s == null || s.isBlank()) throw new IllegalArgumentException("Valor obrigatório.");
         return s.trim();
