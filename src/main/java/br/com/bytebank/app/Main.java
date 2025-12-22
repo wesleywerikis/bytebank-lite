@@ -1,13 +1,15 @@
 package br.com.bytebank.app;
 
-import br.com.bytebank.domain.infra.cliente.RepositorioClienteEmMemoria;
-import br.com.bytebank.domain.infra.conta.RepositorioContaEmMemoria;
+import br.com.bytebank.infra.cliente.RepositorioClienteEmArquivo;
+import br.com.bytebank.infra.conta.RepositorioContaEmArquivo;
+
+import java.nio.file.Path;
 
 public class Main {
     public static void main(String[] args) {
 
-        var repoCliente = new RepositorioClienteEmMemoria();
-        var repoConta = new RepositorioContaEmMemoria();
+        var repoCliente = new RepositorioClienteEmArquivo(Path.of("data/clientes.csv"));
+        var repoConta = new RepositorioContaEmArquivo(Path.of("data/contas.csv"), repoCliente);
 
         new AppConsole(repoCliente, repoConta).run();
     }

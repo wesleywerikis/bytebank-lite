@@ -78,6 +78,10 @@ public final class Conta {
         return valor.setScale(2, RoundingMode.HALF_UP);
     }
 
+    public static Conta reconstruir(UUID id, Cliente titular, BigDecimal saldo) {
+        return new Conta(id, titular, saldo);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
