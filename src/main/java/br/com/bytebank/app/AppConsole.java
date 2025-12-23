@@ -4,6 +4,8 @@ import br.com.bytebank.domain.cliente.Cliente;
 import br.com.bytebank.domain.cliente.RepositorioCliente;
 import br.com.bytebank.domain.conta.Conta;
 import br.com.bytebank.domain.conta.RepositorioConta;
+import br.com.bytebank.domain.extrato.Lancamento;
+import br.com.bytebank.domain.extrato.RepositorioLancamento;
 
 import java.math.BigDecimal;
 import java.util.Scanner;
@@ -15,11 +17,15 @@ public final class AppConsole {
 
     private final RepositorioCliente repositorioCliente;
     private final RepositorioConta repositorioConta;
+    private final RepositorioLancamento repositorioLancamento;
     private Cliente clienteLogado = null;
 
-    public AppConsole(RepositorioCliente repositorioCliente, RepositorioConta repositorioConta) {
+    public AppConsole(RepositorioCliente repositorioCliente, RepositorioConta repositorioConta, RepositorioLancamento repositorioLancamento) {
         if (repositorioCliente == null) throw new IllegalArgumentException("repositorioCliente é obrigatório.");
         if (repositorioConta == null) throw new IllegalArgumentException("repositorioConta é obrigatório.");
+        if (repositorioLancamento == null) throw new IllegalArgumentException("repositorioLancamento é obrigatório.");
+
+        this.repositorioLancamento = repositorioLancamento;
         this.repositorioCliente = repositorioCliente;
         this.repositorioConta = repositorioConta;
     }
@@ -66,7 +72,8 @@ public final class AppConsole {
             case 3 -> depositarEmMinhaConta();
             case 4 -> sacarDeMinhaConta();
             case 5 -> transferirDeMinhaConta();
-            case 6 -> logout();
+            case 6 -> extratoDaMinhaConta();
+            case 7 -> logout();
             default -> System.out.println("Opção inválida.");
         }
     }
@@ -157,6 +164,7 @@ public final class AppConsole {
         BigDecimal valor = lerBigDecimal("Valor do depósito: ");
         conta.depositar(valor);
         repositorioConta.salvar(conta);
+        repositorioLancamento.salvar(Lancamento.deposito(conta.getId(), valor, conta.getSaldo()));
         System.out.println("Saldo atual: " + conta.getSaldo());
     }
 
@@ -165,6 +173,7 @@ public final class AppConsole {
         BigDecimal valor = lerBigDecimal("Valor do saque: ");
         conta.sacar(valor);
         repositorioConta.salvar(conta);
+        repositorioLancamento.salvar(Lancamento.saque(conta.getId(), valor, conta.getSaldo()));
         System.out.println("Saldo atual: " + conta.getSaldo());
     }
 
@@ -180,9 +189,30 @@ public final class AppConsole {
 
         repositorioConta.salvar(origem);
         repositorioConta.salvar(destino);
+        repositorioLancamento.salvar(Lancamento.transferenciaSaida(origem.getId(), destino.getId(), valor, origem.getSaldo()));
+        repositorioLancamento.salvar(Lancamento.transferenciaEntrada(destino.getId(), origem.getId(), valor, destino.getSaldo()));
 
         System.out.println("Transferência OK.");
         System.out.println("Saldo origem: " + origem.getSaldo());
+    }
+
+    private void extratoDaMinhaConta() {
+        Conta conta = escolherMinhaContaPorNumero("Selecione a conta para EXTRATO:");
+        var lista = repositorioLancamento.listarPorConta(conta.getId());
+
+        if (lista.isEmpty()) {
+            System.out.println("Nenhuma peração encontrada para esta conta.");
+            return;
+        }
+
+        System.out.println("=== Extrato ===");
+        for (Lancamento l : lista) {
+            String contra = (l.getContraParteContaId() == null) ? "" : (" | Contra: " + l.getContraParteContaId());
+            System.out.println(l.getInstante() + " | " + l.getTipo()
+                    + " | Valor: " + l.getValor()
+                    + " | Saldo: " + l.getSaldoApos()
+                    + conta);
+        }
     }
 
     private void mostrarMenu() {
@@ -200,7 +230,8 @@ public final class AppConsole {
             System.out.println("3) Depositar");
             System.out.println("4) Sacar");
             System.out.println("5) Transferir");
-            System.out.println("6) Trocar cliente (logout)");
+            System.out.println("6) Extrato");
+            System.out.println("7) Trocar cliente (logout)");
             System.out.println("0) Sair");
         }
     }

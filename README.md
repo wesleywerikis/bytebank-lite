@@ -1,167 +1,196 @@
 # ByteBank Lite (Console)
-### Java Fundamentals by Design
 
-Projeto didático e evolutivo para consolidar **fundamentos reais de Java**, com foco em **design consciente**, não apenas em “fazer funcionar”.
+## 📋 Sobre o Projeto
 
-Este projeto foi criado com a ideia de aprender Java **fora do piloto automático**, entendendo *por que* cada decisão é tomada.
+O **ByteBank Lite** simula um sistema bancário mínimo rodando via **console**, com:
 
----
+- cadastro de clientes
+- criação de contas
+- operações de saldo (depósito/saque/transferência)
+- **extrato/histórico de operações**
+- **persistência em arquivo (CSV)** para manter estado entre execuções
 
-## 🎯 Objetivo do Projeto
+O projeto é organizado para refletir um sistema real:
 
-- Consolidar fundamentos essenciais da linguagem Java
-- Praticar **encapsulamento**, **imutabilidade** e **identidade**
-- Separar claramente:
-    - **Domínio** (regras de negócio)
-    - **Aplicação** (orquestração / UI)
-- Ver a aplicação **rodando de verdade**, desde o início
-- Criar um projeto pequeno, mas **bem pensado**
-
-> ❌ Não é um projeto focado em framework  
-> ✅ É um projeto focado em **pensar como desenvolvedor Java**
+- **Domain**: regras de negócio e invariantes
+- **App**: orquestração e interface (console)
+- **Infra**: persistência (CSV) e detalhes técnicos
 
 ---
 
-## 🧱 Stack
+## 🎯 Objetivos Técnicos
 
-- Java 17
-- Maven
-- Aplicação Console (Sprint 1)
-- Swing (planejado para sprints futuros)
+- Praticar **encapsulamento** e **imutabilidade**
+- Modelar entidades com **identidade (UUID)** e regras claras
+- Diferenciar **criação** vs **reconstrução** de entidades (persistência)
+- Aplicar **interfaces (contratos)** para repositórios
+- Persistir dados sem frameworks, entendendo o fluxo completo
 
 ---
 
-## 📦 Estrutura de Pacotes
+## 🛠️ Tecnologias
+
+- **Java 17**
+- **Maven**
+- **Console Application**
+- Persistência simples via **CSV (java.nio.file)**
+
+---
+
+## ✅ Funcionalidades
+
+### Público (sem login)
+
+- [x] Criar cliente
+- [x] Listar clientes
+- [x] Login (selecionar cliente)
+
+### Cliente logado
+
+- [x] Criar conta para o cliente logado
+- [x] Listar minhas contas
+- [x] Depositar / Sacar / Transferir
+- [x] **Extrato da conta (histórico de operações)**
+- [x] Logout
+
+### Persistência
+
+- [x] Clientes persistidos em `data/clientes.csv`
+- [x] Contas persistidas em `data/contas.csv`
+- [x] Lançamentos persistidos em `data/lancamentos.csv`
+
+---
+
+## 🧱 Arquitetura e Pacotes
 
 ```
 br.com.bytebank
 ├── app
-│ ├── Main.java
-│ └── AppConsole.java
+│ ├── Main.java # composição (wiring)
+│ └── AppConsole.java # UI console + fluxo
 │
 ├── domain
 │ ├── cliente
-│ │ └── Cliente.java
-│ └── conta
-│ └── Conta.java
+│ │ ├── Cliente.java
+│ │ └── RepositorioCliente.java
+│ ├── conta
+│ │ ├── Conta.java
+│ │ └── RepositorioConta.java
+│ └── extrato
+│ ├── Lancamento.java
+│ ├── TipoOperacao.java
+│ └── RepositorioLancamento.java
 │
-└── exception
-└── (planejado)
+└── infra
+├── persistencia
+│ └── CsvIO.java
+├── cliente
+│ └── RepositorioClienteEmArquivo.java
+├── conta
+│ └── RepositorioContaEmArquivo.java
+└── extrato
+└── RepositorioLancamentoEmArquivo.java
 ```
-
 
 ### Regras de Arquitetura
 
-- `domain`
-    - Contém **toda a regra de negócio**
-    - Protege o estado das entidades
-    - Não depende de UI nem de infraestrutura
-
-- `app`
-    - Apenas **orquestra** o fluxo
-    - Lê dados do usuário
-    - Chama métodos do domínio
-    - **Não decide regras**
-
-📌 Nada fora do `domain` pode alterar diretamente o estado das entidades.
+- `domain` **não depende** de `app` nem de `infra`
+- `app` orquestra o fluxo e chama o domínio (não contém regra)
+- `infra` implementa detalhes técnicos (persistência em arquivo) via **interfaces do domínio**
+- Nenhuma classe fora do domínio altera o estado diretamente sem passar por métodos do domínio
 
 ---
 
-## ✅ Funcionalidades (Sprint 1)
+## 🧠 Conceitos Aplicados
 
-- Criar cliente
-- Criar conta para cliente existente
-- Listar clientes
-- Listar contas
-- Depositar valor em conta
-- Sacar valor de conta
-- Transferir valor entre contas
+### Encapsulamento (Conta)
 
-Tudo executado via **console**.
+- saldo não é público
+- não existe `setSaldo`
+- saldo muda apenas por `depositar`, `sacar`, `transferirPara`
 
----
+### Imutabilidade (Cliente)
 
-## ▶️ Como Rodar
-
-### IntelliJ IDEA (recomendado)
-1. Abra o projeto Maven
-2. Localize a classe: br.com.bytebank.app.Main
-3. Execute o método `main`
-
-### Fluxo sugerido de uso
-1. Criar cliente
-2. Copiar o UUID gerado
-3. Criar conta usando o UUID do cliente
-4. Depositar
-5. Sacar
-6. Criar outra conta e transferir
-
----
-
-## 🧠 Conceitos Aplicados (Sprint 1)
-
-### Cliente Imutável
-- Um `Cliente` não muda depois de criado
-- Correções são feitas por **substituição**, mantendo o mesmo `id`
-- Evita efeitos colaterais e bugs invisíveis
-
-### Conta com Estado Mutável Controlado
-- `saldo` **pode mudar**, mas:
-- nunca é público
-- nunca tem `setSaldo`
-- só muda via métodos (`depositar`, `sacar`, `transferirPara`)
+- `Cliente` não muda após criado
+- correções são feitas por substituição mantendo o mesmo `id`
 
 ### Identidade
-- `equals` e `hashCode` baseados apenas no `UUID`
-- Identidade ≠ dados mutáveis
 
-### Encapsulamento Real
-- Leitura permitida (`getSaldo`)
-- Escrita apenas via regras do domínio
+- `equals/hashCode` baseados no `UUID`
+- identidade ≠ dados mutáveis (nome/saldo)
 
-### BigDecimal para Dinheiro
-- Evita problemas clássicos de arredondamento do `double`
-- Padronização de casas decimais
+### Persistência sem Framework
 
----
+- Repositórios por contrato (`RepositorioX`)
+- Implementação em CSV (`RepositorioXEmArquivo`)
+- `Conta.reconstruir(...)` e `Lancamento.reconstruir(...)` para rehidratar estado corretamente
 
-## 🗺️ Roadmap (Visão Geral)
+### Extrato (Eventos de domínio)
 
-- **Sprint 2**
-- Repositórios via interface
-- Persistência simples (arquivo ou memória)
-- **Sprint 3**
-- Transações e extrato (objetos imutáveis)
-- **Sprint 4**
-- equals/hashCode na prática com `Map` e `Set`
-- **Sprint 5**
-- Exceções de domínio específicas
-- **Sprint 6**
-- Organização por módulos e pacotes
-- **Sprint 7**
-- UI Swing simples
-- **Sprint 8**
-- Conexão conceitual com Spring (opcional)
+- `Lancamento` representa um **fato ocorrido** (não “ação”)
+- contém: `contaId`, `instante`, `tipo`, `valor`, `saldoApos`, contrapartida (opcional)
+- extrato é lido a partir dos lançamentos persistidos
 
 ---
 
-## 🧩 Filosofia do Projeto
+## 🚀 Como Executar
 
-> “Imutabilidade não impede mudança.  
-> Ela impede mudança invisível.”
+### Pré-requisitos
 
-> “Domínio protege regras.  
-> Aplicação apenas orquestra.”
+- Java 17+
+- Maven 3.8+
 
-Este repositório é sobre **decisões**, não sobre quantidade de código.
+### Rodando
+
+```bash
+mvn clean compile
+mvn exec:java -Dexec.mainClass="br.com.bytebank.app.Main"
+```
+
+Ou execute diretamente pelo IntelliJ:
+
+- br.com.bytebank.app.Main
 
 ---
 
-## 👨‍💻 Autor
+### Persistência
 
-Projeto desenvolvido como estudo prático de fundamentos Java, com foco em:
-- clareza
-- consistência
-- evolução consciente
+Ao executar, o sistema cria/usa a pasta data/ na raiz do projeto:
+
+- data/clientes.csv
+- data/contas.csv
+- data/lancamentos.csv
+
+---
+
+### 🧪 Fluxo sugerido (teste manual)
+
+    1 - Criar cliente (público)
+    2 - Login como cliente
+    3 - Criar conta
+    4 - Depositar
+    5 - Sacar
+    6 - Transferir para outra conta (UUID)
+    7 - Ver extrato
+    8 - Encerrar e abrir novamente para validar persistência
+
+---
+
+### 🗺️ Roadmap
+
+- [ ] Testes unitários do domínio (JUnit)
+- [ ] Regras de validação e exceções específicas (ex: SaldoInsuficienteException)
+- [ ] Extrato com filtro por período e ordenação customizada
+- [ ] UI Swing (camada de apresentação reutilizando o domínio)
+- [ ] Camada de serviço (application services) para deixar AppConsole mais fina
+
+---
+
+### 👨‍💻 Autor
+
+**Wesley Werikis**
+
+Projeto desenvolvido como estudo prático de fundamentos Java com foco em:
+clareza, consistência e evolução consciente.
 
 ---
